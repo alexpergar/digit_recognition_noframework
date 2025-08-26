@@ -12,8 +12,6 @@ def initialize_parameters(layer_dims):
                     Wl -- weight matrix of shape (layer_dims[l], layer_dims[l-1])
                     bl -- bias vector of shape (layer_dims[l], 1)
     """
-    
-    np.random.seed(1)
     parameters = {}
     L = len(layer_dims)            # number of layers in the network
 
@@ -58,52 +56,25 @@ def linear_activation_forward(A_prev, W, b, activation):
     A_prev -- activations from previous layer (or input data): (size of previous layer, number of examples)
     W -- weights matrix: numpy array of shape (size of current layer, size of previous layer)
     b -- bias vector, numpy array of shape (size of the current layer, 1)
-    activation -- the activation to be used in this layer, stored as a text string: "sigmoid" or "relu"
+    activation -- the activation to be used in this layer, stored as a text string: "softmax" or "relu"
 
     Returns:
     A -- the output of the activation function, also called the post-activation value 
     cache -- a python dictionary containing "linear_cache" and "activation_cache";
              stored for computing the backward pass efficiently
     """
-    
-    if activation == "sigmoid":
-        # Inputs: "A_prev, W, b". Outputs: "A, activation_cache".
-        Z, linear_cache = linear_forward(A_prev, W, b)
-        A, activation_cache = sigmoid(Z)
-    
-    elif activation == "relu":
-        # Inputs: "A_prev, W, b". Outputs: "A, activation_cache".
+    if activation == "relu":
         Z, linear_cache = linear_forward(A_prev, W, b)
         A, activation_cache = relu(Z)
-
     elif activation == "softmax":
         Z, linear_cache = linear_forward(A_prev, W, b)
         A, activation_cache = softmax(Z)
-        
     else:
         print("\033[91mError! Please make sure you have passed the value correctly in the \"activation\" parameter")
     
     assert (A.shape == (W.shape[0], A_prev.shape[1]))
     cache = (linear_cache, activation_cache)
 
-    return A, cache
-
-
-def sigmoid(Z):
-    """
-    Implements the sigmoid activation in numpy
-    
-    Arguments:
-    Z -- numpy array of any shape
-    
-    Returns:
-    A -- output of sigmoid(z), same shape as Z
-    cache -- returns Z as well, useful during backpropagation
-    """
-    
-    A = 1/(1+np.exp(-Z))
-    cache = Z
-    
     return A, cache
 
 
@@ -171,8 +142,7 @@ def relu(Z):
     Returns:
     A -- Post-activation parameter, of the same shape as Z
     cache -- a python dictionary containing "A" ; stored for computing the backward pass efficiently
-    """
-    
+    """  
     A = np.maximum(0,Z)
     
     assert(A.shape == Z.shape)
@@ -183,33 +153,36 @@ def relu(Z):
 
 def L_model_forward(X, parameters):
     """
-    Implement forward propagation for the [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID computation
-    
+    Implement forward propagation for the [LINEAR->RELU]*(L-1)->LINEAR->SOFTMAX computation
+
     Arguments:
     X -- data, numpy array of shape (input size, number of examples)
     parameters -- output of initialize_parameters_deep()
-    
+
     Returns:
     AL -- last post-activation value
     caches -- list of caches containing:
                 every cache of linear_relu_forward() (there are L-1 of them, indexed from 0 to L-2)
-                the cache of linear_sigmoid_forward() (there is one, indexed L-1)
+                the cache of linear_softmax_forward() (there is one, indexed L-1)
+    Returns:
+    AL -- last post-activation value
+    caches -- list of caches containing:
+                every cache of linear_relu_forward() (there are L-1 of them, indexed from 0 to L-2)
+                the cache of linear_softmax_forward() (there is one, indexed L-1)
     """
-
     caches = []
     A = X
     L = len(parameters) // 2                  # number of layers in the neural network
     
     # Implement [LINEAR -> RELU]*(L-1). Add "cache" to the "caches" list.
     for l in range(1, L):
-        A_prev = A 
-        A, cache = linear_activation_forward(A_prev, parameters['W' + str(l)], parameters['b' + str(l)], activation = "relu")
+        A_prev = A
+        A, cache = linear_activation_forward(A_prev, parameters['W' + str(l)], parameters['b' + str(l)], activation="relu")
         caches.append(cache)
     
     # Implement LINEAR -> SOFTMAX. Add "cache" to the "caches" list.
-    AL, cache = linear_activation_forward(A, parameters['W' + str(L)], parameters['b' + str(L)], activation = "softmax")
+    AL, cache = linear_activation_forward(A, parameters['W' + str(L)], parameters['b' + str(L)], activation="softmax")
     caches.append(cache)
-
 
     assert(AL.shape == (10,X.shape[1]))
 
@@ -227,7 +200,6 @@ def compute_cost(AL, Y):
     Returns:
     cost -- cross-entropy cost
     """
-    
     m = Y.shape[1]
 
     # Compute loss from aL and y.
@@ -266,12 +238,12 @@ def L_model_backward(AL, Y, caches):
     
     # Lth layer (SOFTMAX -> LINEAR) gradients. Inputs: "AL, Y, caches". Outputs: "grads["dAL"], grads["dWL"], grads["dbL"]
     current_cache = caches[L-1]
-    grads["dA" + str(L-1)], grads["dW" + str(L)], grads["db" + str(L)] = linear_activation_backward(dAL, current_cache, activation = "softmax")
-    
+    grads["dA" + str(L-1)], grads["dW" + str(L)], grads["db" + str(L)] = linear_activation_backward(dAL, current_cache, activation="softmax")
+
     for l in reversed(range(L-1)):
         # lth layer: (RELU -> LINEAR) gradients.
         current_cache = caches[l]
-        dA_prev_temp, dW_temp, db_temp = linear_activation_backward(grads["dA" + str(l + 1)], current_cache, activation = "relu")
+        dA_prev_temp, dW_temp, db_temp = linear_activation_backward(grads["dA" + str(l + 1)], current_cache, activation="relu")
         grads["dA" + str(l)] = dA_prev_temp
         grads["dW" + str(l + 1)] = dW_temp
         grads["db" + str(l + 1)] = db_temp
@@ -290,7 +262,6 @@ def relu_backward(dA, cache):
     Returns:
     dZ -- Gradient of the cost with respect to Z
     """
-    
     Z = cache
     dZ = np.array(dA, copy=True) # just converting dz to a correct object.
     
@@ -302,9 +273,9 @@ def relu_backward(dA, cache):
     return dZ
 
 
-def sigmoid_backward(dA, cache):
+def softmax_backward(dA, cache):
     """
-    Implement the backward propagation for a single SIGMOID unit.
+    Implement the backward propagation for a single SOFTMAX unit.
 
     Arguments:
     dA -- post-activation gradient, of any shape
@@ -312,14 +283,10 @@ def sigmoid_backward(dA, cache):
 
     Returns:
     dZ -- Gradient of the cost with respect to Z
-    """
-    
-    Z = cache
-    
-    s = 1/(1+np.exp(-Z))
-    dZ = dA * s * (1-s)
-    
-    assert (dZ.shape == Z.shape)
+    """ 
+    # For softmax + categorical cross-entropy, dA is already dZ
+    # This is because d/dZ (softmax + categorical_crossentropy) = AL - Y
+    dZ = dA
     
     return dZ
 
@@ -331,7 +298,7 @@ def linear_activation_backward(dA, cache, activation):
     Arguments:
     dA -- post-activation gradient for current layer l 
     cache -- tuple of values (linear_cache, activation_cache) we store for computing backward propagation efficiently
-    activation -- the activation to be used in this layer, stored as a text string: "sigmoid", "relu", or "softmax"
+    activation -- the activation to be used in this layer, stored as a text string: "relu" or "softmax"
     
     Returns:
     dA_prev -- Gradient of the cost with respect to the activation (of the previous layer l-1), same shape as A_prev
@@ -344,16 +311,12 @@ def linear_activation_backward(dA, cache, activation):
         dZ = relu_backward(dA, activation_cache)
         dA_prev, dW, db = linear_backward(dZ, linear_cache)
         
-    elif activation == "sigmoid":
-        dZ = sigmoid_backward(dA, activation_cache)
-        dA_prev, dW, db = linear_backward(dZ, linear_cache)
-        
     elif activation == "softmax":
         # For softmax + categorical cross-entropy, dA is already dZ
         # This is because d/dZ (softmax + categorical_crossentropy) = AL - Y
-        dZ = dA
+        dZ = softmax_backward(dA, activation_cache)
         dA_prev, dW, db = linear_backward(dZ, linear_cache)
-        
+ 
     else:
         print("\033[91mError! Please make sure you have passed the value correctly in the \"activation\" parameter")
     
@@ -400,7 +363,6 @@ def update_parameters(parameters, grads, learning_rate):
                   parameters["W" + str(l)] = ... 
                   parameters["b" + str(l)] = ...
     """
-    
     L = len(parameters) // 2 # number of layers in the neural network
 
     # Update rule for each parameter. Use a for loop.
@@ -411,10 +373,10 @@ def update_parameters(parameters, grads, learning_rate):
     return parameters
 
 
-def L_layer_model(X, Y, layers_dims, learning_rate = 0.0075, num_iterations = 3000, print_cost=False):
+def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, print_cost=False):
     """
-    Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
-    
+    Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SOFTMAX.
+
     Arguments:
     X -- input data, of shape (n_x, number of examples)
     Y -- true "label" vector (containing 1 if cat, 0 if non-cat), of shape (1, number of examples)
@@ -426,8 +388,6 @@ def L_layer_model(X, Y, layers_dims, learning_rate = 0.0075, num_iterations = 30
     Returns:
     parameters -- parameters learnt by the model. They can then be used to predict.
     """
-
-    np.random.seed(1)
     costs = []                         # keep track of cost
     
     # Parameters initialization.
@@ -436,7 +396,7 @@ def L_layer_model(X, Y, layers_dims, learning_rate = 0.0075, num_iterations = 30
     # Loop (gradient descent)
     for i in range(0, num_iterations):
 
-        # Forward propagation: [LINEAR -> RELU]*(L-1) -> LINEAR -> SIGMOID.
+        # Forward propagation: [LINEAR -> RELU]*(L-1) -> LINEAR -> SOFTMAX.
         AL, caches = L_model_forward(X, parameters)
         
         # Compute cost.
