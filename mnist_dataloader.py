@@ -1,14 +1,24 @@
 """
-MNIST DataLoader and helper functions to show images.
+MNIST DataLoader and helper functions.
 """
+
 
 import struct
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-# MNIST Data Loader Class
+
 class MnistDataloader(object):
+    """
+    MNIST DataLoader for loading and preprocessing the MNIST dataset.
+    The dataset consists of 60,000 training images and 10,000 test images of
+    handwritten digits (0-9). Each image is 28x28 pixels, and the labels are
+    integers from 0 to 9. The images and labels are stored in IDX file format,
+    which is a simple binary format for vectors and multidimensional matrices
+    of various numerical types. The class provides methods to read the images
+    and labels from the IDX files and return them as NumPy arrays.
+    """
     def __init__(self, training_images_filepath,training_labels_filepath,
                  test_images_filepath, test_labels_filepath):
         self.training_images_filepath = training_images_filepath
@@ -16,7 +26,20 @@ class MnistDataloader(object):
         self.test_images_filepath = test_images_filepath
         self.test_labels_filepath = test_labels_filepath
     
-    def read_images_labels(self, images_filepath, labels_filepath):        
+    def read_images_labels(self, images_filepath, labels_filepath):
+        """
+        Read images and labels from IDX files.
+        Args:
+            images_filepath (str): Path to the IDX file containing images.
+            labels_filepath (str): Path to the IDX file containing labels.
+        Returns:
+            images (np.ndarray): NumPy array of shape (num_images, 28, 28)
+                containing the images.
+            labels (np.ndarray): NumPy array of shape (num_images,) containing
+                the labels.
+        Raises:
+            ValueError: If the magic number in the IDX file does not match the expected value.
+        """
         with open(labels_filepath, 'rb') as file:
             magic, size = struct.unpack(">II", file.read(8))
             if magic != 2049:
@@ -33,13 +56,24 @@ class MnistDataloader(object):
         return images, labels
             
     def load_data(self):
+        """
+        Load and return the MNIST dataset.
+        Returns:
+            (x_train, y_train), (x_test, y_test): Tuple containing training and
+                test data and labels.
+        """
         x_train, y_train = self.read_images_labels(self.training_images_filepath, self.training_labels_filepath)
         x_test, y_test = self.read_images_labels(self.test_images_filepath, self.test_labels_filepath)
         return (x_train, y_train),(x_test, y_test)
     
 
-# Helper function to show a list of images with their relating titles
 def show_images(images, title_texts):
+    """
+    Show a list of images with their relating titles.
+    Args:
+        images (list of np.ndarray): List of images to be displayed.
+        title_texts (list of str): List of titles corresponding to each image.
+    """
     cols = 5
     rows = int(len(images)/cols) + 1
     plt.figure(figsize=(30,20))
