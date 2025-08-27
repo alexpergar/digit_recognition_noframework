@@ -1,29 +1,33 @@
 
+import math
+
 import numpy as np
 
 
-def initialize_parameters(layer_dims):
+def initialize_parameters(layers_dims):
     """
+    Initialize parameters for L-layer neural network using He initialization.
+    (He et. al., 2015)
     Arguments:
-    layer_dims -- python array (list) containing the dimensions of each layer in our network
+    layer_dims -- python array (list) containing the size of each layer.
     
     Returns:
     parameters -- python dictionary containing your parameters "W1", "b1", ..., "WL", "bL":
-                    Wl -- weight matrix of shape (layer_dims[l], layer_dims[l-1])
-                    bl -- bias vector of shape (layer_dims[l], 1)
+                    W1 -- weight matrix of shape (layers_dims[1], layers_dims[0])
+                    b1 -- bias vector of shape (layers_dims[1], 1)
+                    ...
+                    WL -- weight matrix of shape (layers_dims[L], layers_dims[L-1])
+                    bL -- bias vector of shape (layers_dims[L], 1)
     """
     parameters = {}
-    L = len(layer_dims)            # number of layers in the network
-
+    L = len(layers_dims) # integer representing the number of layers
+     
     for l in range(1, L):
-        parameters['W' + str(l)] = np.random.randn(layer_dims[l], layer_dims[l-1]) / np.sqrt(layer_dims[l-1]) #*0.01
-        parameters['b' + str(l)] = np.zeros((layer_dims[l], 1))
-        
-        assert(parameters['W' + str(l)].shape == (layer_dims[l], layer_dims[l-1]))
-        assert(parameters['b' + str(l)].shape == (layer_dims[l], 1))
-
+        parameters['W'+str(l)] = np.random.randn(layers_dims[l], layers_dims[l-1]) * np.sqrt(2/layers_dims[l-1])
+        parameters['b'+str(l)] = np.zeros((layers_dims[l], 1))
         
     return parameters
+
 
 
 def linear_forward(A, W, b):
@@ -211,6 +215,45 @@ def compute_cost(AL, Y):
     return cost
 
 
+def random_mini_batches(X, Y, mini_batch_size = 64):
+    """
+    Creates a list of random minibatches from (X, Y)
+    
+    Arguments:
+    X -- input data, of shape (input size, number of examples)
+    Y -- true "label" vector (1 for blue dot / 0 for red dot), of shape (1, number of examples)
+    mini_batch_size -- size of the mini-batches, integer
+    
+    Returns:
+    mini_batches -- list of synchronous (mini_batch_X, mini_batch_Y)
+    """
+    m = X.shape[1]                  # number of training examples
+    mini_batches = []
+        
+    # Step 1: Shuffle (X, Y)
+    permutation = list(np.random.permutation(m))
+    shuffled_X = X[:, permutation]
+    shuffled_Y = Y[:, permutation]
+    
+    # Step 2 - Partition (shuffled_X, shuffled_Y).
+    # Cases with a complete mini batch size only i.e each of 64 examples.
+    num_complete_minibatches = math.floor(m / mini_batch_size) # number of mini batches of size mini_batch_size in your partitionning
+    for k in range(0, num_complete_minibatches):
+        mini_batch_X = shuffled_X[:, k*mini_batch_size:(k+1)*mini_batch_size]
+        mini_batch_Y = shuffled_Y[:, k*mini_batch_size:(k+1)*mini_batch_size]
+        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batches.append(mini_batch)
+    
+    # For handling the end case (last mini-batch < mini_batch_size i.e less than 64)
+    if m % mini_batch_size != 0:
+        mini_batch_X = shuffled_X[:, num_complete_minibatches*mini_batch_size:]
+        mini_batch_Y = shuffled_Y[:, num_complete_minibatches*mini_batch_size:]
+        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batches.append(mini_batch)
+    
+    return mini_batches
+
+
 def L_model_backward(AL, Y, caches):
     """
     Implement the backward propagation for the [LINEAR->RELU] * (L-1) -> LINEAR -> SOFTMAX group
@@ -373,7 +416,7 @@ def update_parameters(parameters, grads, learning_rate):
     return parameters
 
 
-def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, print_cost=False):
+def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_epochs=3000, mini_batch_size=64, print_cost=False):
     """
     Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SOFTMAX.
 
@@ -382,8 +425,8 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
     Y -- true "label" vector (containing 1 if cat, 0 if non-cat), of shape (1, number of examples)
     layers_dims -- list containing the input size and each layer size, of length (number of layers + 1).
     learning_rate -- learning rate of the gradient descent update rule
-    num_iterations -- number of iterations of the optimization loop
-    print_cost -- if True, it prints the cost every 100 steps
+    num_epochs -- number of iterations of the optimization loop
+    print_cost -- if True, it prints the cost every 100 epochs
     
     Returns:
     parameters -- parameters learnt by the model. They can then be used to predict.
@@ -394,50 +437,86 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
     parameters = initialize_parameters(layers_dims)
 
     # Loop (gradient descent)
-    for i in range(0, num_iterations):
+    for i in range(0, num_epochs):
 
-        # Forward propagation: [LINEAR -> RELU]*(L-1) -> LINEAR -> SOFTMAX.
-        AL, caches = L_model_forward(X, parameters)
-        
-        # Compute cost.
-        cost = compute_categorical_crossentropy(AL, Y)
-    
-        # Backward propagation.
-        grads = L_model_backward(AL, Y, caches)
- 
-        # Update parameters.
-        parameters = update_parameters(parameters, grads, learning_rate)
+        minibatches = random_mini_batches(X, Y, mini_batch_size)
+        cost_total = 0
+
+        for minibatch in minibatches:
+
+            # Get the mini-batch.
+            (minibatch_X, minibatch_Y) = minibatch
+
+            # Forward propagation: [LINEAR -> RELU]*(L-1) -> LINEAR -> SOFTMAX.
+            AL, caches = L_model_forward(minibatch_X, parameters)
+            
+            # Compute cost and add to total cost.
+            cost = compute_categorical_crossentropy(AL, minibatch_Y)
+            cost_total += cost / len(minibatch)
+
+            # Backward propagation.
+            grads = L_model_backward(AL, minibatch_Y, caches)
+     
+            # Update parameters.
+            parameters = update_parameters(parameters, grads, learning_rate)
+
+        cost_avg = cost_total / len(minibatches)
                 
         # Print the cost every 100 iterations and for the last iteration
-        if print_cost and (i % 100 == 0 or i == num_iterations - 1):
-            print("Cost after iteration {}: {}".format(i, np.squeeze(cost)))
+        if print_cost and (i % 100 == 0 or i == num_epochs - 1):
+            print("Cost after epoch {}: {}".format(i, np.squeeze(cost_avg)))
         if i % 100 == 0:
-            costs.append(cost)
-    
+            costs.append(cost_avg)
+
     return parameters, costs
 
 
-def predict(X, y, parameters):
+def predict(X, Y, parameters):
     """
-    This function is used to predict the results of a L-layer neural network for multiclass classification.
-    
+    Predicts the results of a L-layer neural network for multiclass classification using one-hot encoded labels.
+
     Arguments:
-    X -- data set of examples you would like to label
-    y -- true labels (for accuracy calculation)
+    X -- data set of examples you would like to label, shape (input size, number of examples)
+    Y -- true labels in one-hot encoding, shape (num_classes, number of examples)
     parameters -- parameters of the trained model
-    
+
     Returns:
-    p -- predictions for the given dataset X
+    p -- predicted class indices for the given dataset X
+    accuracy -- accuracy of predictions
     """
-    m = X.shape[1]
     # Forward propagation
     probas, _ = L_model_forward(X, parameters)
-    
+
     # Multiclass prediction: take argmax across classes
     p = np.argmax(probas, axis=0)
-    
+    y_true = np.argmax(Y, axis=0)
+
     # Calculate accuracy
-    accuracy = np.mean(p == y)
+    accuracy = np.mean(p == y_true)
     print("Accuracy: " + str(accuracy))
-    
+
     return p
+
+
+def show_wrongly_classified(X, Y, parameters, num_to_show=5):
+    """
+    Displays indices and true/predicted labels for some wrongly classified items.
+
+    Arguments:
+    X -- input data, shape (input size, number of examples)
+    Y -- true labels in one-hot encoding, shape (num_classes, number of examples)
+    parameters -- trained model parameters
+    num_to_show -- number of wrongly classified items to show
+
+    Returns:
+    wrong_indices -- list of indices of wrongly classified items
+    """
+    probas, _ = L_model_forward(X, parameters)
+    preds = np.argmax(probas, axis=0)
+    true_labels = np.argmax(Y, axis=0)
+    wrong_indices = np.where(preds != true_labels)[0]
+
+    print(f"Found {len(wrong_indices)} wrongly classified items.")
+    for idx in wrong_indices[:num_to_show]:
+        print(f"Index: {idx}, True label: {true_labels[idx]}, Predicted: {preds[idx]}")
+    # return wrong_indices.tolist()
