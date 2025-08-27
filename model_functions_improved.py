@@ -29,7 +29,6 @@ def initialize_parameters(layers_dims):
     return parameters
 
 
-
 def linear_forward(A, W, b):
     """
     Implement the linear part of a layer's forward propagation.
@@ -393,6 +392,41 @@ def linear_backward(dZ, cache):
     return dA_prev, dW, db
 
 
+def initialize_adam(parameters) :
+    """
+    Initializes v and s as two python dictionaries with:
+                - keys: "dW1", "db1", ..., "dWL", "dbL" 
+                - values: numpy arrays of zeros of the same shape as the corresponding gradients/parameters.
+    
+    Arguments:
+    parameters -- python dictionary containing your parameters.
+                    parameters["W" + str(l)] = Wl
+                    parameters["b" + str(l)] = bl
+    
+    Returns: 
+    v -- python dictionary that will contain the exponentially weighted average of the gradient. Initialized with zeros.
+                    v["dW" + str(l)] = ...
+                    v["db" + str(l)] = ...
+    s -- python dictionary that will contain the exponentially weighted average of the squared gradient. Initialized with zeros.
+                    s["dW" + str(l)] = ...
+                    s["db" + str(l)] = ...
+
+    """
+    
+    L = len(parameters) // 2 # number of layers in the neural networks
+    v = {}
+    s = {}
+    
+    # Initialize v, s. Input: "parameters". Outputs: "v, s".
+    for l in range(1, L + 1):
+        v["dW" + str(l)] = np.zeros(parameters["W"+str(l)].shape)
+        v["db" + str(l)] = np.zeros(parameters["b"+str(l)].shape)
+        s["dW" + str(l)] = np.zeros(parameters["W"+str(l)].shape)
+        s["db" + str(l)] = np.zeros(parameters["b"+str(l)].shape)
+    
+    return v, s
+
+
 def update_parameters(parameters, grads, learning_rate):
     """
     Update parameters using gradient descent
@@ -416,6 +450,63 @@ def update_parameters(parameters, grads, learning_rate):
     return parameters
 
 
+def update_parameters_with_adam(parameters, grads, v, s, t, learning_rate = 0.01,
+                                beta1 = 0.9, beta2 = 0.999,  epsilon = 1e-8):
+    """
+    Update parameters using the Adam optimization algorithm.
+
+    Arguments:
+    parameters -- python dictionary containing your parameters:
+                    parameters['W' + str(l)] = Wl
+                    parameters['b' + str(l)] = bl
+    grads -- python dictionary containing your gradients for each parameter:
+                    grads['dW' + str(l)] = dWl
+                    grads['db' + str(l)] = dbl
+    v -- Adam variable, moving average of the first gradient, maintained as a python dictionary
+    s -- Adam variable, moving average of the squared gradient, maintained as a python dictionary
+    t -- Adam variable, counts the number of steps taken for bias correction
+    learning_rate -- learning rate, scalar
+    beta1 -- exponential decay hyperparameter for the first moment estimates
+    beta2 -- exponential decay hyperparameter for the second moment estimates
+    epsilon -- hyperparameter to prevent division by zero in the Adam update, a small scalar
+
+    Returns:
+    parameters -- python dictionary containing your updated parameters
+    v -- updated Adam variable, moving average of the first gradient, python dictionary
+    s -- updated Adam variable, moving average of the squared gradient, python dictionary
+    v_corrected -- python dictionary containing bias-corrected first moment estimates
+    s_corrected -- python dictionary containing bias-corrected second moment estimates
+    """
+    
+    L = len(parameters) // 2                 # number of layers in the neural networks
+    v_corrected = {}                         # Initializing first moment estimate, python dictionary
+    s_corrected = {}                         # Initializing second moment estimate, python dictionary
+    
+    # Perform Adam update on all parameters
+    for l in range(1, L + 1):
+        # Moving average of the gradients. Inputs: "v, grads, beta1". Output: "v".
+        v["dW" + str(l)] = beta1 * v["dW" + str(l)] + (1-beta1)*grads["dW" + str(l)]
+        v["db" + str(l)] = beta1 * v["db" + str(l)] + (1-beta1)*grads["db" + str(l)]
+
+        # Compute bias-corrected first moment estimate. Inputs: "v, beta1, t". Output: "v_corrected".
+        v_corrected["dW" + str(l)] = v["dW" + str(l)] / (1-beta1**t)
+        v_corrected["db" + str(l)] = v["db" + str(l)] / (1-beta1**t)
+
+        # Moving average of the squared gradients. Inputs: "s, grads, beta2". Output: "s".
+        s["dW" + str(l)] = beta2 * s["dW" + str(l)] + (1-beta2)*grads["dW" + str(l)]**2
+        s["db" + str(l)] = beta2 * s["db" + str(l)] + (1-beta2)*grads["db" + str(l)]**2
+
+        # Compute bias-corrected second raw moment estimate. Inputs: "s, beta2, t". Output: "s_corrected".
+        s_corrected["dW" + str(l)] = s["dW" + str(l)] / (1-beta2**t)
+        s_corrected["db" + str(l)] = s["db" + str(l)] / (1-beta2**t)
+
+        # Update parameters. Inputs: "parameters, learning_rate, v_corrected, s_corrected, epsilon". Output: "parameters".
+        parameters["W" + str(l)] = parameters["W" + str(l)] - learning_rate*v_corrected["dW" + str(l)] / (np.sqrt(s_corrected["dW" + str(l)]) + epsilon)
+        parameters["b" + str(l)] = parameters["b" + str(l)] - learning_rate*v_corrected["db" + str(l)] / (np.sqrt(s_corrected["db" + str(l)]) + epsilon)
+
+    return parameters, v, s, v_corrected, s_corrected
+
+
 def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_epochs=3000, mini_batch_size=64, print_cost=False):
     """
     Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SOFTMAX.
@@ -432,9 +523,13 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_epochs=3000, mini
     parameters -- parameters learnt by the model. They can then be used to predict.
     """
     costs = []                         # keep track of cost
+    t = 0                               # initializing the counter required for Adam update
     
     # Parameters initialization.
     parameters = initialize_parameters(layers_dims)
+
+    # Adam parameters initialization.
+    v, s = initialize_adam(parameters)
 
     # Loop (gradient descent)
     for i in range(0, num_epochs):
@@ -452,13 +547,15 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_epochs=3000, mini
             
             # Compute cost and add to total cost.
             cost = compute_categorical_crossentropy(AL, minibatch_Y)
-            cost_total += cost / len(minibatch)
+            cost_total += cost
 
             # Backward propagation.
             grads = L_model_backward(AL, minibatch_Y, caches)
      
             # Update parameters.
-            parameters = update_parameters(parameters, grads, learning_rate)
+            # parameters = update_parameters(parameters, grads, learning_rate)
+            t = t + 1  # Adam counter
+            parameters, v, s, _, _ = update_parameters_with_adam(parameters, grads, v, s, t, learning_rate)
 
         cost_avg = cost_total / len(minibatches)
                 
