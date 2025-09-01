@@ -28,6 +28,7 @@ The goal is to provide a learning-friendly, from-scratch implementation of a mul
 │── model.ipynb # Jupyter Notebook with training & experiments
 │── mnist_dataloader.py # Functions to load the MNIST dataset
 │── model_functions.py # Functions used in the model implementation
+│── mathematical_foundations.pdf # Mathematical explanation of the implemented functions
 │── README.md # Project documentation
 ```
 
